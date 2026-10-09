@@ -20,7 +20,7 @@ DSH 没有"删除会话"的界面。侧边栏只提供**归档**（从视图隐�
 
 ## 作为库使用
 
-`lib/` 下的模块是纯 ESM，不依赖 DSH 运行时，可以直接导入——web 侧边栏就是这样消费它们的：
+`lib/` 下的模块是纯 ESM，不依赖 DSH 运行时，可以直接导入：
 
 ```js
 import { listAllSessionsGrouped, listSessionsForProject } from "dsh-session-history/lib/list.js";
@@ -45,9 +45,9 @@ import { deleteSessions } from "dsh-session-history/lib/delete.js";
 因此**只适用于 headless / agent profile**。
 
 > **不要在 web profile 中注册此插件。** web 环境不存在上述服务，插件会在加载时抛错，
-> 并导致整棵插件树崩溃。web 侧边栏应改用上面的库函数。
+> 并导致整棵插件树崩溃。web 端应改用上面的库函数。
 
-在 agent profile 中注册时，向该 profile 的 `cordis.patch.yml` 添加：
+在 agent profile 的 `cordis.patch.yml` 中添加：
 
 ```yaml
 - insert:
@@ -71,11 +71,11 @@ import { deleteSessions } from "dsh-session-history/lib/delete.js";
 `manage_sessions(action: "list", all_projects: true, include_summaries: true)` 的真实输出：
 
 ```
-Total: 4 session(s) across 1 workspace(s)
+Total: 2 session(s) across 1 workspace(s)
 
-━━ dsh-session-history (4 sessions)  /home/peam/open-projects/dsh-session-history ━━
-  • session-9ef251a3-356f-4696-93fe-84948b98e6fe  (91.2 KB, 2026-10-09T09:48:47)  "为什么node_modules为什么也会被git提交"
-  • session-bca20195-4395-4925-a3ab-5c17f1d0eed8  (1.2 MB, 2026-10-08T11:08:09)  "dsh中，   "dsh-session-manager": ..."
+━━ my-project (2 sessions)  /path/to/my-project ━━
+  • session-9ef251a3-356f-4696-93fe-84948b98e6fe  (91.2 KB, 2026-10-09T09:48:47)  "如何修复这个问题"
+  • session-bca20195-4395-4925-a3ab-5c17f1d0eed8  (1.2 MB, 2026-10-08T11:08:09)  "帮我重构这段代码"
 ```
 
 `manage_sessions(action: "search", query: "node_modules", all_projects: true)`：
@@ -83,8 +83,8 @@ Total: 4 session(s) across 1 workspace(s)
 ```
 Found 1 matching session(s):
 
-━━ session-9ef251a3-356f-4696-93fe-84948b98e6fe  (dsh-session-history, 1 match(es)) ━━
-  [seq 8] 为什么node_modules为什么也会被git提交
+━━ session-9ef251a3-356f-4696-93fe-84948b98e6fe  (my-project, 1 match(es)) ━━
+  [seq 8] node_modules 为什么也会被提交
 ```
 
 `manage_sessions(action: "delete", session_ids: ["session-0e2bec1e-..."])`：
@@ -96,25 +96,75 @@ Deleted (1):
   ✓ session-0e2bec1e-...
 ```
 
-> 输出文本由 `lib/format.js` 生成，目前为英文，与界面语言无关。
+> 输出文本由 `lib/format.js` 生成，目前为英文，与文档语言无关。
 
 ## 安装
 
-克隆仓库，并把 DSH 的 `node_modules` 链接过来，以便插件入口导入 `@deepseek-ai/dsh-tools`：
+有两种方式。**方式一**无需手动 clone，适合只想用的人；**方式二**适合需要改代码的人。
 
-```bash
-git clone https://github.com/peamed/dsh-session-history.git ~/open-projects/dsh-session-history
+> 下文用 `$DSH_PROFILE_DIR` 代指你要安装到的 profile 目录，例如 `~/.dsh/profiles/<profile-name>`。
+> 它是 pnpm 管理的，因此推荐直接编辑其中的 `package.json` 后用 `pnpm install`，而不是手工建软链接。
 
-# 指向提供 @deepseek-ai/dsh-tools 的 DSH 安装目录。
-# 若 DSH 是通过 npx 运行的：
-DSH_NM="$HOME/.npm/_npx/<hash>/node_modules"
-ln -s "$DSH_NM" ~/open-projects/dsh-session-history/node_modules
+### 方式一：直接引用 Git 仓库
+
+在 profile 的 `package.json` 里把依赖指向 Git 仓库，无需本地 clone：
+
+```jsonc
+{
+  "dependencies": {
+    // 跟随默认分支最新提交
+    "dsh-session-history": "github:peamed/dsh-session-history",
+    // 或锁定到某个 tag / commit，更可复现
+    // "dsh-session-history": "github:peamed/dsh-session-history#v0.1.0"
+  }
+}
 ```
 
-注意：
+然后在 profile 目录执行：
+
+```bash
+cd "$DSH_PROFILE_DIR" && pnpm install
+```
+
+同样可以在命令行一步完成，效果等价：
+
+```bash
+cd "$DSH_PROFILE_DIR"
+pnpm add "dsh-session-history@github:peamed/dsh-session-history"
+```
+
+### 方式二：Clone 到本地
+
+适合需要修改源码、加调试断点，或想跟随本地改动的情况：
+
+```bash
+git clone https://github.com/peamed/dsh-session-history.git
+cd dsh-session-history
+
+# 插件入口需要 @deepseek-ai/dsh-tools，从 DSH 安装目录链接过来。
+# 若 DSH 通过 npx 运行，<hash> 是 npx 缓存目录名：
+DSH_NM="$HOME/.npm/_npx/<hash>/node_modules"
+ln -s "$DSH_NM" node_modules
+```
+
+再把 profile 的依赖指向这个本地目录（注意 `file:` 后要用绝对路径）：
+
+```jsonc
+{
+  "dependencies": {
+    "dsh-session-history": "file:/absolute/path/to/dsh-session-history"
+  }
+}
+```
+
+```bash
+cd "$DSH_PROFILE_DIR" && pnpm install
+```
+
+两种方式都请留意：
 
 - 只有 `lib/index.js` 需要 `@deepseek-ai/dsh-tools`，其余模块无任何依赖。
-- 这里的 `node_modules` 是符号链接，所以 `.gitignore` 中写的是不带尾斜杠的 `node_modules`。
+- 方式二中的 `node_modules` 是符号链接，所以本仓库 `.gitignore` 写的是不带尾斜杠的 `node_modules`。
   带尾斜杠的规则只匹配真正的目录，会让符号链接漏进提交。
 
 ## 工作原理
@@ -136,7 +186,7 @@ DSH 将会话存为**多帧 Zstandard 压缩的 JSONL**：
 算法推导而来：
 
 ```
-/home/peam/projects/tf-fly-pc  →  --home-peam-projects-tf-fly-pc--
+/home/user/projects/my-app  →  --home-user-projects-my-app--
 ```
 
 分隔符（`/`、`\`、`:`）转为 `-`（连续的分隔符会合并），开头的分隔符被剥除，
