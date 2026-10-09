@@ -1,31 +1,26 @@
 # dsh-session-history
 
-A session management library and tool plugin for
-[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH).
-It reads DSH conversation sessions directly from disk and provides three
-operations: **list**, **search**, and **delete**.
+[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）的会话管理库与工具插件。
+它直接从磁盘读取 DSH 会话，提供三个操作：**list**（列出）、**search**（搜索）、**delete**（删除）。
 
-## Why?
+## 为什么需要它
 
-DSH has no "delete session" UI. The sidebar only offers **archive** (hide from
-view), and there is no RPC to permanently remove a session. Over time, stale
-sessions accumulate on disk. This project fills that gap.
+DSH 没有"删除会话"的界面。侧边栏只提供**归档**（从视图隐藏），也没有可以永久移除会话的 RPC。
+时间一长，磁盘上会堆积大量过期会话。本项目填补这一空白。
 
-## Features
+## 功能
 
-| Action | Description |
-|--------|-------------|
-| **list** | List sessions grouped by workspace, with ID, size, modification time, archive status, and optionally the first user message as a summary |
-| **search** | Full-text search through user messages across sessions (case-insensitive) |
-| **delete** | Permanently remove sessions from disk (cannot be undone) |
+| 操作 | 说明 |
+|------|------|
+| **list** | 按工作区分组列出会话，包含 ID、大小、修改时间、归档状态，可选附带首条用户消息作为摘要 |
+| **search** | 跨会话全文搜索用户消息（不区分大小写） |
+| **delete** | 从磁盘永久删除会话（不可撤销） |
 
-These are exposed two ways: as plain library functions in `lib/`, and as a
-`manage_sessions` tool for the agent.
+这些能力有两种使用方式：`lib/` 下的普通库函数，以及供 agent 使用的 `manage_sessions` 工具。
 
-## Library usage
+## 作为库使用
 
-The `lib/` modules are plain ESM with no DSH runtime dependency, so they can be
-imported directly — this is how the web sidebar consumes them:
+`lib/` 下的模块是纯 ESM，不依赖 DSH 运行时，可以直接导入——web 侧边栏就是这样消费它们的：
 
 ```js
 import { listAllSessionsGrouped, listSessionsForProject } from "dsh-session-history/lib/list.js";
@@ -33,28 +28,26 @@ import { searchSessions } from "dsh-session-history/lib/search.js";
 import { deleteSessions } from "dsh-session-history/lib/delete.js";
 ```
 
-| Module | Exports |
-|--------|---------|
-| `lib/index.js` | Tool registration and action dispatch (the plugin entry) |
-| `lib/paths.js` | `projectKey()`, `projectDir()`, `SESSIONS_ROOT`, `WORKSPACE_FILE` |
-| `lib/zstd.js` | `decompressSessionFile()`, `extractUserMessages()`, `getSessionSummary()` |
-| `lib/workspace.js` | `loadWorkspaceData()`, `isArchived()` |
-| `lib/list.js` | `scanSessionDir()`, `listAllSessionsGrouped()`, `listSessionsForProject()` |
+| 模块 | 导出 |
+|------|------|
+| `lib/index.js` | 工具注册与 action 分发（插件入口） |
+| `lib/paths.js` | `projectKey()`、`projectDir()`、`SESSIONS_ROOT`、`WORKSPACE_FILE` |
+| `lib/zstd.js` | `decompressSessionFile()`、`extractUserMessages()`、`getSessionSummary()` |
+| `lib/workspace.js` | `loadWorkspaceData()`、`isArchived()` |
+| `lib/list.js` | `scanSessionDir()`、`listAllSessionsGrouped()`、`listSessionsForProject()` |
 | `lib/search.js` | `searchSessions()` |
 | `lib/delete.js` | `deleteSessions()` |
-| `lib/format.js` | `formatBytes()`, `truncate()`, `renderList()`, `renderSearch()`, `renderDelete()` |
+| `lib/format.js` | `formatBytes()`、`truncate()`、`renderList()`、`renderSearch()`、`renderDelete()` |
 
-## Using the `manage_sessions` tool
+## 使用 `manage_sessions` 工具
 
-The tool plugin (`lib/index.js`) requires the agent-only services
-`systemPrompt` and `tools`. It is meant for **headless / agent profiles**.
+工具插件（`lib/index.js`）依赖 agent 专属服务 `systemPrompt` 和 `tools`，
+因此**只适用于 headless / agent profile**。
 
-> **Do not register this plugin in a web profile.** Those services do not exist
-> in the web environment, and the plugin will throw on load and take down the
-> whole plugin tree. The web sidebar should use the library functions above
-> instead.
+> **不要在 web profile 中注册此插件。** web 环境不存在上述服务，插件会在加载时抛错，
+> 并导致整棵插件树崩溃。web 侧边栏应改用上面的库函数。
 
-To register it in an agent profile, add to that profile's `cordis.patch.yml`:
+在 agent profile 中注册时，向该 profile 的 `cordis.patch.yml` 添加：
 
 ```yaml
 - insert:
@@ -63,19 +56,19 @@ To register it in an agent profile, add to that profile's `cordis.patch.yml`:
       config: {}
 ```
 
-### Tool parameters
+### 工具参数
 
-| Parameter | Type | Applies to | Description |
-|-----------|------|-----------|-------------|
-| `action` | string, required | — | `"list"`, `"search"`, or `"delete"` |
-| `all_projects` | boolean | list, search | If true, operate across ALL workspaces. Default false (current project only) |
-| `include_summaries` | boolean | list | If true, include the first user message of each session as a preview. Default false |
-| `query` | string | search | Keyword to search for in user messages (case-insensitive) |
-| `session_ids` | string[] | delete | Session IDs to delete, e.g. `session-0e2bec1e-...` or a bare UUID |
+| 参数 | 类型 | 适用操作 | 说明 |
+|------|------|---------|------|
+| `action` | string，必填 | — | `"list"`、`"search"` 或 `"delete"` |
+| `all_projects` | boolean | list、search | 为 true 时跨**所有**工作区操作。默认 false（仅当前项目） |
+| `include_summaries` | boolean | list | 为 true 时附带每个会话的首条用户消息作为预览。默认 false |
+| `query` | string | search | 在用户消息中搜索的关键词（不区分大小写） |
+| `session_ids` | string[] | delete | 要删除的会话 ID，如 `session-0e2bec1e-...` 或裸 UUID |
 
-### Example output
+### 输出示例
 
-Real output from `manage_sessions(action: "list", all_projects: true, include_summaries: true)`:
+`manage_sessions(action: "list", all_projects: true, include_summaries: true)` 的真实输出：
 
 ```
 Total: 4 session(s) across 1 workspace(s)
@@ -85,7 +78,7 @@ Total: 4 session(s) across 1 workspace(s)
   • session-bca20195-4395-4925-a3ab-5c17f1d0eed8  (1.2 MB, 2026-10-08T11:08:09)  "dsh中，   "dsh-session-manager": ..."
 ```
 
-And from `manage_sessions(action: "search", query: "node_modules", all_projects: true)`:
+`manage_sessions(action: "search", query: "node_modules", all_projects: true)`：
 
 ```
 Found 1 matching session(s):
@@ -94,7 +87,7 @@ Found 1 matching session(s):
   [seq 8] 为什么node_modules为什么也会被git提交
 ```
 
-And from `manage_sessions(action: "delete", session_ids: ["session-0e2bec1e-..."])`:
+`manage_sessions(action: "delete", session_ids: ["session-0e2bec1e-..."])`：
 
 ```
 Session deletion complete.
@@ -103,99 +96,88 @@ Deleted (1):
   ✓ session-0e2bec1e-...
 ```
 
-## Installation
+> 输出文本由 `lib/format.js` 生成，目前为英文，与界面语言无关。
 
-Clone the repository and link DSH's `node_modules` so the plugin entry can
-import `@deepseek-ai/dsh-tools`:
+## 安装
+
+克隆仓库，并把 DSH 的 `node_modules` 链接过来，以便插件入口导入 `@deepseek-ai/dsh-tools`：
 
 ```bash
 git clone https://github.com/peamed/dsh-session-history.git ~/open-projects/dsh-session-history
 
-# Point node_modules at the DSH installation that provides @deepseek-ai/dsh-tools.
-# If DSH was run via npx:
+# 指向提供 @deepseek-ai/dsh-tools 的 DSH 安装目录。
+# 若 DSH 是通过 npx 运行的：
 DSH_NM="$HOME/.npm/_npx/<hash>/node_modules"
 ln -s "$DSH_NM" ~/open-projects/dsh-session-history/node_modules
 ```
 
-Notes:
+注意：
 
-- Only `lib/index.js` needs `@deepseek-ai/dsh-tools`; the other modules are
-  dependency-free.
-- `node_modules` is a symlink here, so `.gitignore` lists `node_modules`
-  without a trailing slash — a trailing slash would only match a real
-  directory and would let the symlink slip into commits.
+- 只有 `lib/index.js` 需要 `@deepseek-ai/dsh-tools`，其余模块无任何依赖。
+- 这里的 `node_modules` 是符号链接，所以 `.gitignore` 中写的是不带尾斜杠的 `node_modules`。
+  带尾斜杠的规则只匹配真正的目录，会让符号链接漏进提交。
 
-## How it works
+## 工作原理
 
-### Session storage format
+### 会话存储格式
 
-DSH stores sessions as **multi-frame Zstandard-compressed JSONL**:
+DSH 将会话存为**多帧 Zstandard 压缩的 JSONL**：
 
 ```
 ~/.dsh/sessions/<encoded-cwd>/<session-id>/session.jsonl.zstd
 ```
 
-Each event batch is appended as a separate Zstandard frame. The plugin locates
-frame boundaries by scanning for the Zstandard magic bytes (`28 b5 2f fd`),
-decompresses each frame with `zstdDecompressSync`, and concatenates the results.
+每个事件批次作为独立的 Zstandard 帧追加写入。插件通过扫描 Zstandard 魔数
+（`28 b5 2f fd`）定位帧边界，用 `zstdDecompressSync` 逐帧解压后再拼接结果。
 
-### Path encoding
+### 路径编码
 
-The project directory name is derived from the session's `cwd` using the same
-`projectKey()` algorithm as `dsh-session-persistence-jsonl`:
+项目目录名由会话的 `cwd` 经与 `dsh-session-persistence-jsonl` 相同的 `projectKey()`
+算法推导而来：
 
 ```
 /home/peam/projects/tf-fly-pc  →  --home-peam-projects-tf-fly-pc--
 ```
 
-Separators (`/`, `\`, `:`) become `-` (consecutive runs collapse), the leading
-run is stripped, non-safe characters become `~XXXX` hex escapes, and the result
-is wrapped in `--...--`.
+分隔符（`/`、`\`、`:`）转为 `-`（连续的分隔符会合并），开头的分隔符被剥除，
+非安全字符转为 `~XXXX` 十六进制转义，最终结果用 `--...--` 包裹。
 
-### Workspace grouping
+### 工作区分组
 
-Workspace metadata is read from `~/.dsh/storages/workspace.json`, which maps
-workspace IDs to project paths, titles, and registered session IDs. Sessions on
-disk that do not belong to any workspace are listed under `Ungrouped`.
-Workspace-registered sessions with no directory on disk are flagged
-`orphaned`; archived sessions are flagged `archived`.
+工作区元数据读取自 `~/.dsh/storages/workspace.json`，其中记录了工作区 ID 到项目路径、
+标题及已注册会话 ID 的映射。磁盘上不属于任何工作区的会话归入 `Ungrouped`。
+已注册但磁盘上无对应目录的会话标记为 `orphaned`；已归档会话标记为 `archived`。
 
-### Deletion
+### 删除行为
 
-`deleteSessions()` scans every project directory under the sessions root for a
-matching session ID and removes it with `rmSync(recursive: true)`. The tool
-entry additionally calls `ctx.workspaces.archiveSession(id)` (best effort) so
-the sidebar hides the session immediately.
+`deleteSessions()` 会遍历会话根目录下的所有项目目录查找匹配的会话 ID，
+并用 `rmSync(recursive: true)` 删除。工具入口还会（尽力而为地）调用
+`ctx.workspaces.archiveSession(id)`，使侧边栏立即隐藏该会话。
 
-## Usage examples
+## 使用示例
 
-Ask the agent in natural language:
+直接用自然语言让 agent 执行：
 
-- "列出当前项目的所有会话" → `list` current project
-- "列出所有工作区的会话，包含摘要" → `list` all projects with summaries
-- "搜索包含 'cesium' 的会话" → `search` for "cesium"
-- "搜索所有项目中包含 'bug' 的会话" → `search` all projects for "bug"
-- "删除会话 session-0e2bec1e-..." → `delete` specific session
-- "删除所有已归档的会话" → `list` then `delete`
+- "列出当前项目的所有会话" → `list` 当前项目
+- "列出所有工作区的会话，包含摘要" → `list` 所有项目并带摘要
+- "搜索包含 'cesium' 的会话" → `search` 关键词 "cesium"
+- "搜索所有项目中包含 'bug' 的会话" → `search` 所有项目搜 "bug"
+- "删除会话 session-0e2bec1e-..." → `delete` 指定会话
+- "删除所有已归档的会话" → 先 `list` 再 `delete`
 
-## Requirements
+## 环境要求
 
-- Node.js `>= 22` (uses built-in `node:zlib`, which added `zstdDecompressSync`
-  in v22.15.0)
-- For the tool entry only: `@deepseek-ai/dsh-tools` from a DSH installation
+- Node.js `>= 22.15.0`（使用内置 `node:zlib`，其 Zstd API 自 v22.15.0 起提供）
+- 仅工具入口需要：DSH 安装中的 `@deepseek-ai/dsh-tools`
 
-## Limitations
+## 已知限制
 
-- **Live sessions**: Deleting a session that is currently active may not take
-  effect until the session is closed. The plugin does not check if a session is
-  live before deleting.
-- **Search depth**: Search only scans user messages, not assistant responses or
-  tool outputs, to keep results relevant and fast.
-- **Search caps**: At most 20 matching sessions are returned, with at most 3
-  matched messages shown per session.
-- **No undo**: Deletion is permanent. Always `list` or `search` first to verify
-  the session IDs.
+- **活动会话**：删除当前正在使用的会话，可能要等该会话关闭后才生效。
+  插件在删除前不会检查会话是否处于活动状态。
+- **搜索范围**：仅扫描用户消息，不含助手回复与工具输出，以保证结果相关且快速。
+- **搜索上限**：最多返回 20 个匹配会话，每个会话最多展示 3 条匹配消息。
+- **不可撤销**：删除是永久的。请先 `list` 或 `search` 确认会话 ID。
 
-## License
+## 许可证
 
 MIT
