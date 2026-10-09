@@ -1,0 +1,14 @@
+{
+  "name": "dsh-session-manager",
+  "description": "Session management tool for DeepSeek Harness: list and delete sessions from disk",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./lib/*": "./lib/*",
+    "./package.json": "./package.json"
+  }
+}
